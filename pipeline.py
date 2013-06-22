@@ -14,7 +14,7 @@ This pipeline relies on this code inserted into your universal-tracker redis dat
 $ redis-cli
 redis 127.0.0.1:6379> select 13
 OK
-redis 127.0.0.1:6379[13]> set greader:extra_parameters 'data["task_urls_pattern"] = "https://www.google.com/reader/api/0/stream/contents/feed/%s?r=n&n=1000&hl=en&likes=true&comments=true&client=ArchiveTeam"; data["task_urls_url"] = "http://greader-items.dyn.ludios.net:32047/greader-items/" + item[0...6] + "/" + item + ".gz"; data["user_agent"] = "Wget/1.14 gzip ArchiveTeam"; data["wget_timeout"] = "60"; data["wget_tries"] = "20"; data["wget_waitretry"] = "5";'
+redis 127.0.0.1:6379[13]> set greader-stats:extra_parameters 'data["cookie_id"], data["cookie_value"] = open("/home/ivan/directory/cookie", "r") {|f| f.read().strip().split("|", 2)}; data["task_urls_pattern"] = "https://www.google.com/reader/api/0/stream/details?s=feed%2F%s&tz=0&fetchTrends=true&output=json&client=ArchiveTeam"; data["task_urls_url"] = "http://greader-items.dyn.ludios.net:32047/greader-stats-items/" + item[0...6] + "/" + item + ".gz"; data["user_agent"] = "Wget/1.14 gzip ArchiveTeam"; data["wget_timeout"] = "60"; data["wget_tries"] = "20"; data["wget_waitretry"] = "5";'
 OK
 
 The HTTP response for task_urls_url should be a gzip-compressed
@@ -124,8 +124,8 @@ class GetItemFromTracker(TrackerRequest):
 				task_urls_data = urllib2.urlopen(item["task_urls_url"]).read()
 				item["task_urls"] = list(pattern % (u,) for u in gunzip_string(task_urls_data).rstrip('\n').decode('utf-8').split(u'\n'))
 
-			item.log_output("Received item '%s' from tracker with %d URLs; first URL is %r\n" % (
-				item["item_name"], len(item["task_urls"]), item["task_urls"][0]))
+			item.log_output("Received item '%s' from tracker with %d URLs; first URL is %r; using cookie %r\n" % (
+				item["item_name"], len(item["task_urls"]), item["task_urls"][0], item["cookie_id"]))
 			self.complete_item(item)
 		else:
 			item.log_output("Tracker responded with empty response.\n")
@@ -216,7 +216,7 @@ if not WGET_LUA:
 #
 # Update this each time you make a non-cosmetic change.
 # It will be added to the WARC files and reported to the tracker.
-VERSION = "20130620.01"
+VERSION = "20130622.01"
 
 
 ###########################################################################
@@ -282,8 +282,6 @@ class CookWARC(ExternalProcess):
 			os.path.join(PIPELINE_DIR, "warc2warc_greader.py"),
 			"--gzip",
 			"--decode_http",
-			"--strip-404s",
-			"--json-hrefs-file", ItemInterpolation("%(data_dir)s/%(warc_file_base)s.hrefs.bz2"),
 			"--output", ItemInterpolation("%(data_dir)s/%(warc_file_base)s.cooked.warc.gz"),
 			ItemInterpolation("%(data_dir)s/%(warc_file_base)s.warc.gz")
 		]
@@ -300,7 +298,7 @@ project = Project(
 	title="Google Reader",
 	project_html="""
 	<h2>Google Reader <span class="links"><a href="http://www.google.com/reader/">Website</a> &middot; <a
-href="http://tracker.archiveteam.org/greader/">Leaderboard</a></span></h2>
+href="http://tracker.archiveteam.org/greader-stats/">Leaderboard</a></span></h2>
 	<p><i>Google Reader</i> is closing July 1st, 2013</p>
   """
 )
@@ -309,7 +307,7 @@ href="http://tracker.archiveteam.org/greader/">Leaderboard</a></span></h2>
 try:
 	TRACKER_URL = os.environ["GREADER_TRACKER_URL"]
 except KeyError:
-	TRACKER_URL = "http://tracker-alt.dyn.ludios.net:9292/greader"
+	TRACKER_URL = "http://tracker-alt.dyn.ludios.net:9292/greader-stats"
 
 
 ###########################################################################
@@ -331,7 +329,7 @@ pipeline = Pipeline(
 	# warc_prefix is the first part of the warc filename
 	#
 	# this task will set item["item_dir"] and item["warc_file_base"]
-	PrepareDirectories(warc_prefix="greader"),
+	PrepareDirectories(warc_prefix="greaderstats"),
 
 	# execute Wget+Lua
 	#
@@ -349,11 +347,12 @@ pipeline = Pipeline(
 			"--timeout", ItemInterpolation("%(wget_timeout)s"),
 			"--tries", ItemInterpolation("%(wget_tries)s"),
 			"--waitretry", ItemInterpolation("%(wget_waitretry)s"),
+			"--header", ItemInterpolation("Cookie: %(cookie_value)s"),
 			"--header", "Accept-Encoding: gzip",
-			"--lua-script", "greader.lua",
+			"--lua-script", "greader-stats.lua",
 			"--warc-file", ItemInterpolation("%(item_dir)s/%(warc_file_base)s"),
 			"--warc-header", "operator: Archive Team",
-			"--warc-header", "greader-dld-script-version: " + VERSION,
+			"--warc-header", "greader-stats-dld-script-version: " + VERSION,
 			"--input", "-"
 		],
 		max_tries=2,
@@ -381,7 +380,6 @@ pipeline = Pipeline(
 			# there can be multiple groups with multiple files
 			# file sizes are measured per group
 			"data": [ItemInterpolation("%(data_dir)s/%(warc_file_base)s.cooked.warc.gz")],
-			"hrefs": [ItemInterpolation("%(data_dir)s/%(warc_file_base)s.hrefs.bz2")]
 		},
 		id_function=(lambda item: {"ua": item["user_agent"]})
 	),
@@ -404,7 +402,6 @@ pipeline = Pipeline(
 			# this may include directory names.
 			# note: HTTP uploads will only upload the first file on this list
 			files=[
-				ItemInterpolation("%(data_dir)s/%(warc_file_base)s.hrefs.bz2"),
 				ItemInterpolation("%(data_dir)s/%(warc_file_base)s.cooked.warc.gz")
 			],
 			# the relative path for the rsync command
