@@ -14,7 +14,7 @@ This pipeline relies on this code inserted into your universal-tracker redis dat
 $ redis-cli
 redis 127.0.0.1:6379> select 13
 OK
-redis 127.0.0.1:6379[13]> set greader-stats:extra_parameters 'data["cookie_id"], data["cookie_value"] = open("/home/ivan/directory/cookie", "r") {|f| f.read().strip().split("|", 2)}; data["task_urls_pattern"] = "https://www.google.com/reader/api/0/stream/details?s=feed%2F%s&tz=0&fetchTrends=true&output=json&client=ArchiveTeam"; data["task_urls_url"] = "http://greader-items.dyn.ludios.net:32047/greader-stats-items/" + item[0...6] + "/" + item + ".gz"; data["user_agent"] = "Wget/1.14 gzip ArchiveTeam"; data["wget_timeout"] = "60"; data["wget_tries"] = "20"; data["wget_waitretry"] = "5";'
+redis 127.0.0.1:6379[13]> set greader-stats:extra_parameters 'data["cookie_id"], data["cookie_value"] = open("/home/ivan/directory/cookie", "r") {|f| f.read().strip().split("|", 2)}; data["task_urls_pattern"] = "https://www.google.com/reader/api/0/stream/details?s=feed%%2F%s&tz=0&fetchTrends=true&output=json&client=ArchiveTeam"; data["task_urls_url"] = "http://greader-items.dyn.ludios.net:32047/greader-stats-items/" + item[0...6] + "/" + item + ".gz"; data["user_agent"] = "Wget/1.14 gzip ArchiveTeam"; data["wget_timeout"] = "60"; data["wget_tries"] = "20"; data["wget_waitretry"] = "5";'
 OK
 
 The HTTP response for task_urls_url should be a gzip-compressed
@@ -216,7 +216,7 @@ if not WGET_LUA:
 #
 # Update this each time you make a non-cosmetic change.
 # It will be added to the WARC files and reported to the tracker.
-VERSION = "20130622.01"
+VERSION = "20130622.02"
 
 
 ###########################################################################

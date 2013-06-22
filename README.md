@@ -1,4 +1,4 @@
-greader-stats-grab NOT READY YET
+greader-stats-grab
 ==================
 
 Seesaw script that grabs feed statistics for Archive Team's Google Reader grab: http://www.archiveteam.org/index.php?title=Google_Reader
